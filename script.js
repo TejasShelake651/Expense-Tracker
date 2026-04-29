@@ -36,6 +36,14 @@ const deleteModal = document.getElementById('deleteModal');
 const cancelBtn = document.getElementById('cancelBtn');
 const confirmBtn = document.getElementById('confirmBtn');
 const successToast = document.getElementById('successToast');
+const viewChartBtn = document.getElementById('viewChartBtn');
+const viewCategoryBtn = document.getElementById('viewCategoryBtn');
+const viewReportBtn = document.getElementById('viewReportBtn');
+const exportCsvBtn = document.getElementById('exportCsvBtn');
+const chartView = document.getElementById('chartView');
+const categoryView = document.getElementById('categoryView');
+const reportView = document.getElementById('reportView');
+const reportType = document.getElementById('reportType');
 
 function login(username, password) {
     currentUser = username.trim();
@@ -292,6 +300,220 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// ========== ADVANCED FEATURES ==========
+
+// Category-wise Summary
+function getCategorySummary() {
+    const summary = {};
+    expenses.forEach(exp => {
+        if (!summary[exp.category]) {
+            summary[exp.category] = 0;
+        }
+        summary[exp.category] += exp.amount;
+    });
+    return summary;
+}
+
+function renderCategoryView() {
+    if (expenses.length === 0) {
+        document.getElementById('categoryContainer').innerHTML = '<p class="no-data">No expenses to display</p>';
+        return;
+    }
+
+    const summary = getCategorySummary();
+    const total = Object.values(summary).reduce((a, b) => a + b, 0);
+    
+    let html = '<div class="category-list">';
+    Object.entries(summary).sort((a, b) => b[1] - a[1]).forEach(([category, amount]) => {
+        const percentage = ((amount / total) * 100).toFixed(1);
+        const barWidth = percentage;
+        html += `
+            <div class="category-item">
+                <div class="category-header">
+                    <span class="category-name">${categoryEmojis[category] || '📌'} ${category}</span>
+                    <span class="category-amount">${formatCurrency(amount)}</span>
+                </div>
+                <div class="category-bar">
+                    <div class="category-bar-fill" style="width: ${barWidth}%"></div>
+                </div>
+                <div class="category-percent">${percentage}% of total</div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    document.getElementById('categoryContainer').innerHTML = html;
+}
+
+// Text-based Chart
+function renderTextChart() {
+    if (expenses.length === 0) {
+        document.getElementById('asciiChart').textContent = 'No expenses to display';
+        return;
+    }
+
+    const summary = getCategorySummary();
+    const maxAmount = Math.max(...Object.values(summary));
+    const maxBarLength = 30;
+    
+    let chart = '📊 EXPENSE DISTRIBUTION CHART\n';
+    chart += '═'.repeat(50) + '\n\n';
+    
+    Object.entries(summary).sort((a, b) => b[1] - a[1]).forEach(([category, amount]) => {
+        const barLength = Math.round((amount / maxAmount) * maxBarLength);
+        const bar = '█'.repeat(barLength);
+        const percentage = ((amount / Object.values(summary).reduce((a, b) => a + b)) * 100).toFixed(1);
+        const padding = category.padEnd(15);
+        chart += `${categoryEmojis[category] || '📌'} ${padding} ${bar} ${formatCurrency(amount)} (${percentage}%)\n`;
+    });
+    
+    chart += '\n' + '═'.repeat(50) + '\n';
+    chart += `💰 Total: ${formatCurrency(Object.values(summary).reduce((a, b) => a + b))}\n`;
+    chart += `📈 Transactions: ${expenses.length}\n`;
+    
+    document.getElementById('asciiChart').textContent = chart;
+}
+
+// Daily/Weekly Report
+function getDailyReport() {
+    const dailyData = {};
+    expenses.forEach(exp => {
+        const date = exp.date;
+        if (!dailyData[date]) {
+            dailyData[date] = { total: 0, count: 0, transactions: [] };
+        }
+        dailyData[date].total += exp.amount;
+        dailyData[date].count += 1;
+        dailyData[date].transactions.push(exp);
+    });
+    return dailyData;
+}
+
+function getWeeklyReport() {
+    const weeklyData = {};
+    expenses.forEach(exp => {
+        const date = new Date(exp.date);
+        const weekStart = new Date(date);
+        weekStart.setDate(date.getDate() - date.getDay());
+        const weekKey = weekStart.toISOString().split('T')[0];
+        
+        if (!weeklyData[weekKey]) {
+            weeklyData[weekKey] = { total: 0, count: 0, transactions: [] };
+        }
+        weeklyData[weekKey].total += exp.amount;
+        weeklyData[weekKey].count += 1;
+        weeklyData[weekKey].transactions.push(exp);
+    });
+    return weeklyData;
+}
+
+function renderReport(type) {
+    if (expenses.length === 0) {
+        document.getElementById('reportContainer').innerHTML = '<p class="no-data">No expenses to display</p>';
+        return;
+    }
+
+    const data = type === 'daily' ? getDailyReport() : getWeeklyReport();
+    const dates = Object.keys(data).sort().reverse();
+    
+    let html = `<div class="report-list"><h4>${type === 'daily' ? 'Daily Report' : 'Weekly Report'}</h4>`;
+    
+    dates.forEach(date => {
+        const report = data[date];
+        const displayDate = type === 'daily' ? 
+            formatDate(date) : 
+            `Week of ${formatDate(date)}`;
+        
+        html += `
+            <div class="report-item">
+                <div class="report-header">
+                    <span class="report-date">${displayDate}</span>
+                    <span class="report-summary">${report.count} transaction${report.count > 1 ? 's' : ''} • ${formatCurrency(report.total)}</span>
+                </div>
+                <div class="report-transactions">
+        `;
+        
+        report.transactions.forEach(trans => {
+            html += `
+                    <div class="report-transaction">
+                        <span>${categoryEmojis[trans.category] || '📌'} ${trans.name}</span>
+                        <span>${formatCurrency(trans.amount)}</span>
+                    </div>
+            `;
+        });
+        
+        html += `
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    document.getElementById('reportContainer').innerHTML = html;
+}
+
+// CSV Export
+function generateCSV() {
+    if (expenses.length === 0) {
+        showToast('⚠️ No expenses to export');
+        return;
+    }
+
+    let csv = 'Date,Name,Category,Amount (₹)\n';
+    
+    const sortedExpenses = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    sortedExpenses.forEach(exp => {
+        csv += `${exp.date},"${exp.name}",${exp.category},${exp.amount.toFixed(2)}\n`;
+    });
+    
+    // Add summary section
+    csv += '\n\n--- SUMMARY ---\n';
+    const summary = getCategorySummary();
+    Object.entries(summary).forEach(([cat, amount]) => {
+        csv += `${cat},${Object.keys(expenses.filter(e => e.category === cat)).length},${amount.toFixed(2)}\n`;
+    });
+    
+    const total = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+    csv += `\nTotal Expenses,${expenses.length},${total.toFixed(2)}\n`;
+    
+    // Download
+    const element = document.createElement('a');
+    element.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv));
+    element.setAttribute('download', `expense_report_${new Date().toISOString().split('T')[0]}.csv`);
+    element.style.display = 'none';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+    
+    showToast('✅ CSV exported successfully!');
+}
+
+// Toggle Views
+function hideAllViews() {
+    chartView.style.display = 'none';
+    categoryView.style.display = 'none';
+    reportView.style.display = 'none';
+}
+
+function showChartView() {
+    hideAllViews();
+    renderTextChart();
+    chartView.style.display = 'block';
+}
+
+function showCategoryView() {
+    hideAllViews();
+    renderCategoryView();
+    categoryView.style.display = 'block';
+}
+
+function showReportView() {
+    hideAllViews();
+    const type = reportType.value;
+    renderReport(type);
+    reportView.style.display = 'block';
+}
+
 loginForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const username = usernameInput.value.trim();
@@ -305,6 +527,17 @@ logoutBtn.addEventListener('click', logout);
 expenseForm.addEventListener('submit', addExpense);
 cancelBtn.addEventListener('click', hideDeleteModal);
 confirmBtn.addEventListener('click', deleteExpense);
+
+// Advanced Features Event Listeners
+viewChartBtn.addEventListener('click', showChartView);
+viewCategoryBtn.addEventListener('click', showCategoryView);
+viewReportBtn.addEventListener('click', showReportView);
+exportCsvBtn.addEventListener('click', generateCSV);
+reportType.addEventListener('change', () => {
+    if (reportView.style.display !== 'none') {
+        showReportView();
+    }
+});
 
 deleteModal.addEventListener('click', (e) => {
     if (e.target === deleteModal) {

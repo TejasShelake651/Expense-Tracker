@@ -143,6 +143,43 @@
                 </form>
             </section>
 
+            <section class="advanced-features">
+                <div class="features-toolbar">
+                    <h2 class="section-title">Analytics & Reports</h2>
+                    <div class="toolbar-buttons">
+                        <button id="viewChartBtn" class="feature-btn" title="View text-based chart">📊 Chart</button>
+                        <button id="viewCategoryBtn" class="feature-btn" title="Category summary">🏷️ Categories</button>
+                        <button id="viewReportBtn" class="feature-btn" title="Daily/Weekly report">📅 Reports</button>
+                        <button id="exportCsvBtn" class="feature-btn" title="Export to CSV">💾 Export CSV</button>
+                    </div>
+                </div>
+
+                <div id="chartView" class="feature-view" style="display: none;">
+                    <h3>Expense Chart</h3>
+                    <div id="chartContainer" class="chart-container">
+                        <pre id="asciiChart"></pre>
+                    </div>
+                </div>
+
+                <div id="categoryView" class="feature-view" style="display: none;">
+                    <h3>Category-wise Breakdown</h3>
+                    <div id="categoryContainer" class="category-container">
+                    </div>
+                </div>
+
+                <div id="reportView" class="feature-view" style="display: none;">
+                    <div class="report-controls">
+                        <label>Report Type:</label>
+                        <select id="reportType" class="form-input">
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                        </select>
+                    </div>
+                    <div id="reportContainer" class="report-container">
+                    </div>
+                </div>
+            </section>
+
             <section class="expenses-section">
                 <h2 class="section-title">Recent Expenses</h2>
                 
